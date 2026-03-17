@@ -1,0 +1,207 @@
+# ESP32 Shutter Release Control Unit — Project Specification
+
+**Target camera:** Canon EOS R6  
+**Target MCU board:** ESP32-WROOM-32 DevKit  
+**Date:** 2026-03-15  
+
+---
+
+## 1. Project Overview
+
+This project implements a wired remote shutter release controller for the Canon EOS R6 camera using an ESP32-WROOM-32 development board. Two 4N36 optocouplers provide galvanic isolation between the ESP32 and the camera's remote terminal, replacing the mechanical switches found in a traditional RS-60E3 remote. Two independent pushbuttons — **Focus** and **Shutter Release** — give the user direct, real-time control over the camera's half-press and full-press functions, mimicking the feel of the original RS-60E3 cable release.
+
+---
+
+## 2. Canon R6 Remote Terminal (E3 / RS-60E3)
+
+The Canon EOS R6 exposes a **2.5 mm stereo (TRS) "Remote" jack** — Canon's proprietary "E3" terminal — on its side.
+
+| TRS Contact | Signal   | Trigger action                          |
+|-------------|----------|-----------------------------------------|
+| Sleeve      | GND      | Camera circuit ground reference         |
+| Ring        | Focus    | Short to GND → initiates autofocus (half-press) |
+| Tip         | Shutter  | Short to GND → releases shutter (full-press)    |
+
+> **Important:** The camera supplies approximately **3.3 V / 0.5 mA** on the Focus and Shutter lines. Do **not** connect ESP32 GPIO pins directly to these lines — use the optocoupler isolation circuit described below.
+
+---
+
+## 3. Hardware Components
+
+| Component | Quantity | Notes |
+|-----------|----------|-------|
+| ESP32-WROOM-32 DevKit | 1 | 3.3 V GPIO logic |
+| 4N36 optocoupler | 2 | One for Focus, one for Shutter |
+| 220 Ω resistor | 2 | Input-side current limiting (see §5) |
+| 2.5 mm TRS plug / cable | 1 | Wired to camera remote jack |
+| Momentary pushbutton | 2 | One for Focus, one for Shutter Release |
+| Assorted resistors | — | Pull-downs / pull-ups as needed |
+| Breadboard / PCB, wires | — | |
+
+---
+
+## 4. GPIO Pin Assignments
+
+> The previously used GPIO 30 and GPIO 31 **do not exist** on the ESP32-WROOM-32; they are not broken out on the module. The table below uses valid, output-capable pins.
+
+| GPIO | Direction | Function |
+|------|-----------|----------|
+| **GPIO 26** | Digital Output | Focus control — drives 4N36 #1 LED anode (via 220 Ω) |
+| **GPIO 27** | Digital Output | Shutter control — drives 4N36 #2 LED anode (via 220 Ω) |
+| **GPIO 4**  | Digital Input (INPUT_PULLUP) | Focus pushbutton (active LOW) |
+| **GPIO 15** | Digital Input (INPUT_PULLUP) | Shutter Release pushbutton (active LOW) |
+
+---
+
+## 5. Circuit Design
+
+### 5.1 Current-Limiting Resistor Calculation (4N36 Input Side)
+
+The 4N36 LED forward voltage is **V_F ≈ 1.2 V**. Driving from a 3.3 V GPIO:
+
+$$R = \frac{V_{GPIO} - V_F}{I_F} = \frac{3.3\,\text{V} - 1.2\,\text{V}}{10\,\text{mA}} = 210\,\Omega$$
+
+Use the next standard value: **220 Ω**. This gives I_F ≈ 9.5 mA, well within the 4N36's 60 mA absolute maximum and sufficient for reliable switching (CTR ≥ 20 % at 10 mA → I_C ≥ 2 mA, which comfortably sinks the camera's 0.5 mA).
+
+### 5.2 Wiring — Focus Channel (4N36 #1)
+
+```
+ESP32 GPIO 26 ──[220 Ω]──► Anode  (pin 1)  ┐
+                                4N36 #1      │ Input (LED) side
+ESP32 GND      ───────────── Cathode (pin 2) ┘
+
+Camera Ring (Focus) ──── Collector (pin 5) ┐
+                                4N36 #1     │ Output (transistor) side
+Camera Sleeve (GND) ──── Emitter   (pin 4) ┘
+```
+
+When GPIO 26 is driven **HIGH**, the LED turns on, the phototransistor conducts, and the camera's Focus line is shorted to camera GND → autofocus is initiated.
+
+### 5.3 Wiring — Shutter Channel (4N36 #2)
+
+Identical circuit using **GPIO 27** and **4N36 #2**, but connecting the phototransistor to the camera's **Tip (Shutter)** contact:
+
+```
+ESP32 GPIO 27 ──[220 Ω]──► Anode  (pin 1) ┐
+                                4N36 #2     │ Input (LED) side
+ESP32 GND      ───────────── Cathode (pin 2)┘
+
+Camera Tip (Shutter) ─── Collector (pin 5) ┐
+                                4N36 #2     │ Output (transistor) side
+Camera Sleeve (GND) ──── Emitter   (pin 4) ┘
+```
+
+When GPIO 27 is driven **HIGH**, the shutter is released.
+
+> **Ground note:** The ESP32 GND and the camera's Sleeve (GND) are **not** connected together. The optocoupler provides full galvanic isolation. The camera circuit is self-contained on the output/transistor side.
+
+### 5.4 Focus Pushbutton
+
+Connect one terminal of the Focus pushbutton to **GPIO 4**, the other to **GND**. The firmware enables the internal pull-up (`INPUT_PULLUP`). A button press reads as LOW.
+
+### 5.5 Shutter Release Pushbutton
+
+Connect one terminal of the Shutter Release pushbutton to **GPIO 15**, the other to **GND**. The firmware enables the internal pull-up (`INPUT_PULLUP`). A button press reads as LOW.
+
+---
+
+## 6. Functional Requirements
+
+### 6.1 Two-Button Operation
+
+The controller has two independent momentary pushbuttons — **Focus** and **Shutter Release** — that directly control the corresponding optocoupler channels. The user controls timing by how long each button is physically held.
+
+#### 6.1.1 Focus Button (GPIO 4)
+
+| Condition | Action |
+|-----------|--------|
+| Focus button pressed and held | Assert Focus (GPIO 26 HIGH) — camera initiates autofocus |
+| Focus button released | De-assert Focus (GPIO 26 LOW) |
+
+The Focus line remains active for exactly as long as the user holds the button.
+
+#### 6.1.2 Shutter Release Button (GPIO 15)
+
+| Condition | Action |
+|-----------|--------|
+| Shutter Release button pressed and held | Assert Shutter (GPIO 27 HIGH) — camera releases shutter |
+| Shutter Release button released | De-assert Shutter (GPIO 27 LOW) |
+
+The Shutter line remains active for exactly as long as the user holds the button.
+
+#### 6.1.3 Combined Operation (Focus + Shutter)
+
+The two buttons operate **independently and simultaneously**. The typical shooting workflow is:
+
+| Step | User action | Result |
+|------|-------------|--------|
+| 1 | Press and hold Focus button | Autofocus engages (half-press) |
+| 2 | While still holding Focus, press Shutter Release button | Shutter fires (full-press) with focus locked |
+| 3 | Release Shutter Release button | Shutter line de-asserts |
+| 4 | Release Focus button | Focus line de-asserts |
+
+> **Note:** If the Shutter Release button is pressed **without** the Focus button, only the shutter fires (no autofocus). This is useful when the camera is set to manual focus or when focus has already been acquired.
+
+### 6.2 Button Debouncing
+
+Both buttons shall be software-debounced with a minimum period of **50 ms** to prevent false triggers from contact bounce.
+
+### 6.4 Idle State
+
+In the idle state both GPIO 26 and GPIO 27 shall be **LOW** (optocouplers off, camera undisturbed).
+
+### 6.5 Serial Debug Output
+
+During development, the firmware shall print pin states and timing values to the UART at **115200 baud** via `Serial.println()`.
+
+---
+
+## 7. Software Architecture (for the junior developer)
+
+```
+setup()
+  ├─ Serial.begin(115200)
+  ├─ pinMode(FOCUS_PIN,          OUTPUT)     → LOW
+  ├─ pinMode(SHUTTER_PIN,       OUTPUT)     → LOW
+  ├─ pinMode(FOCUS_BUTTON_PIN,  INPUT_PULLUP)
+  └─ pinMode(SHUTTER_BUTTON_PIN, INPUT_PULLUP)
+
+loop()
+  ├─ read Focus button (debounced)
+  │   ├─ held  → digitalWrite(FOCUS_PIN,   HIGH)
+  │   └─ released → digitalWrite(FOCUS_PIN, LOW)
+  ├─ read Shutter Release button (debounced)
+  │   ├─ held  → digitalWrite(SHUTTER_PIN,   HIGH)
+  │   └─ released → digitalWrite(SHUTTER_PIN, LOW)
+  └─ serial debug output (periodic)
+```
+
+---
+
+## 8. Pin Summary (quick reference card)
+
+```
+ESP32-WROOM-32
+┌──────────────────────────┐
+│  GPIO 26 ──[220Ω]── 4N36 #1 (Focus)   → Camera Ring
+│  GPIO 27 ──[220Ω]── 4N36 #2 (Shutter) → Camera Tip
+│  GPIO  4 ── Focus pushbutton ── GND
+│  GPIO 15 ── Shutter Release pushbutton ── GND
+│  GND     ── Optocoupler cathodes, Button GND
+│  3.3V    ── (unused)
+└──────────────────────────┘
+Camera 2.5 mm TRS plug
+  Sleeve (GND) ── 4N36 #1 emitter, 4N36 #2 emitter
+  Ring   (Focus)  ── 4N36 #1 collector
+  Tip    (Shutter) ── 4N36 #2 collector
+```
+
+---
+
+## 9. Open Questions / Clarifications Needed
+
+1. **Intervalometer mode:** Should the device support automatic repeated shooting at fixed intervals? If yes, what range (seconds/minutes)?
+2. **Bulb mode:** Is long-exposure / bulb mode (hold shutter open for a programmable duration) required?
+3. **Display/feedback:** Is any visual feedback (LED, OLED display) required beyond Serial debug output?
+4. **Power supply:** Will the ESP32 be powered via USB or a dedicated battery pack?
+5. ~~**Focus-only mode:** Should the Focus channel be triggerable independently (without shutter release)?~~ **Resolved** — Focus and Shutter are now independent buttons.

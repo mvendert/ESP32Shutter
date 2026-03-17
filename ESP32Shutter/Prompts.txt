@@ -1,0 +1,47 @@
+You are a senior developer experienced in writing Arduino style software for the ESP32 
+platform. You have following specifications and need to write developer instructions .
+for a junior developer using the following document you received from a coworker.
+Your first task is to generate the specifications in markdown format. 
+You may ask any questions on the go for clarification.
+We are going to be implementing a ESP32 shupper release control unit using 
+an ESP32 Wroom32 devboard for a canon R5 camera. For that we are using the remote 
+shutter jack (TRS Jack) with an 4N36 optocoupler.
+The Canon R6 features a 2.5 mm stereo (TRS) ‘Remote’ jack (Canon’s “E3” remote terminal) 
+for wired shutter release (compatible with Canon’s RS-60E3 remote switches)   . 
+This jack has three contacts – typically: Sleeve = Ground, Ring = Focus (half-press), 
+Tip = Shutter (full-press). The camera’s design is such that shorting specific 
+contacts to ground triggers the camera: connecting the focus contact to ground 
+initiates autofocus, while connecting the shutter contact to ground releases the shutter 
+(takes a photo).
+Because the camera’s remote circuit carries a small voltage (~3.2–3.3 V and ~0.5 mA) 
+on the focus/shutter lines, it’s important to avoid directly wiring the ESP32’s 
+GPIO pins into the camera. Direct connection could create ground loops or risk damage 
+to the camera’s electronics if something goes wrong.
+We have some 4N36 optocouplers, some 2.5mm trs plug cables, and resistors of a 
+multitude of resistors at hand. We also have some pushbuttons and a rotary variable 
+resistor as often used in Arduino demo projects at hand.
+We tend to treat the optocoupler as a bridge between the ESP32 and the camera, 
+like a push-button that closes the camera’s shutter circuit when the ESP32 outputs a 
+HIGH signal. Here’s how to wire it for one of two connections. So repeat for forcus and 
+shutter triggering.
+•	Optocoupler Input (LED) Side: Connect an ESP32 digital output pin to the 
+optocoupler’s anode through the current-limiting resistor. Connect the optocoupler’s 
+cathode to the ESP32 ground (GND). When the ESP32 sets this 
+pin HIGH, current flows through the LED, illuminating it inside the optocoupler. 
+(Be sure to also connect the ESP32 ground to the negative side of your power source 
+and the ground of the opto’s input.)
+•	Optocoupler Output (Transistor) Side: The optocoupler’s output is a 
+phototransistor that behaves like a switch when the internal LED is lit. 
+Connect the phototransistor’s collector to the camera’s shutter release wire 
+(the 2.5 mm plug’s shutter contact), 
+and connect the phototransistor’s emitter to the camera’s 
+ground (the 2.5 mm plug’s sleeve). When the optocoupler LED is activated by the ESP32, 
+the phototransistor conducts, effectively shorting the camera’s shutter line to ground, 
+which triggers the shutter release   . 
+(If you also need autofocus control, use a second optocoupler similarly to short the 
+focus contact to ground when commanded. 
+Each optocoupler effectively replaces one of the two switches in a traditional remote 
+shutter.
+In practice, you would replicate the output side for two channels if you need 
+separate focus and shutter control (each optocoupler acting like a switch for 
+one function).
