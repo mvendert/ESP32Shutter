@@ -2,6 +2,13 @@
 	"folders": [
 		{
 			"path": "ESP32Shutter"
+		},
+		{
+			"name": "TriggerTester",
+			"path": "TriggerTester"
+		},
+		{
+			"path": "Documentation"
 		}
 	],
 	"settings": {}
