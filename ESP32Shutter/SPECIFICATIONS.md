@@ -46,10 +46,10 @@ The Canon EOS R6 exposes a **2.5 mm stereo (TRS) "Remote" jack** — Canon's pro
 
 | GPIO | Direction | Function |
 |------|-----------|----------|
-| **GPIO 26** | Digital Output | Focus control — drives 4N36 #1 LED anode (via 220 Ω) |
-| **GPIO 27** | Digital Output | Shutter control — drives 4N36 #2 LED anode (via 220 Ω) |
-| **GPIO 4**  | Digital Input (INPUT_PULLUP) | Focus pushbutton (active LOW) |
-| **GPIO 15** | Digital Input (INPUT_PULLUP) | Shutter Release pushbutton (active LOW) |
+| **GPIO 25** | Digital Output | Focus control — drives 4N36 #1 LED anode (via 220 Ω) |
+| **GPIO 26** | Digital Output | Shutter control — drives 4N36 #2 LED anode (via 220 Ω) |
+| **GPIO 18** | Digital Input (INPUT_PULLUP) | Focus pushbutton (active LOW) |
+| **GPIO 19** | Digital Input (INPUT_PULLUP) | Shutter Release pushbutton (active LOW) |
 
 ---
 
@@ -66,7 +66,7 @@ Use the next standard value: **220 Ω**. This gives I_F ≈ 9.5 mA, well within 
 ### 5.2 Wiring — Focus Channel (4N36 #1)
 
 ```
-ESP32 GPIO 26 ──[220 Ω]──► Anode  (pin 1)  ┐
+ESP32 GPIO 25 ──[220 Ω]──► Anode  (pin 1)  ┐
                                 4N36 #1      │ Input (LED) side
 ESP32 GND      ───────────── Cathode (pin 2) ┘
 
@@ -75,14 +75,14 @@ Camera Ring (Focus) ──── Collector (pin 5) ┐
 Camera Sleeve (GND) ──── Emitter   (pin 4) ┘
 ```
 
-When GPIO 26 is driven **HIGH**, the LED turns on, the phototransistor conducts, and the camera's Focus line is shorted to camera GND → autofocus is initiated.
+When GPIO 25 is driven **HIGH**, the LED turns on, the phototransistor conducts, and the camera's Focus line is shorted to camera GND → autofocus is initiated.
 
 ### 5.3 Wiring — Shutter Channel (4N36 #2)
 
-Identical circuit using **GPIO 27** and **4N36 #2**, but connecting the phototransistor to the camera's **Tip (Shutter)** contact:
+Identical circuit using **GPIO 26** and **4N36 #2**, but connecting the phototransistor to the camera's **Tip (Shutter)** contact:
 
 ```
-ESP32 GPIO 27 ──[220 Ω]──► Anode  (pin 1) ┐
+ESP32 GPIO 26 ──[220 Ω]──► Anode  (pin 1) ┐
                                 4N36 #2     │ Input (LED) side
 ESP32 GND      ───────────── Cathode (pin 2)┘
 
@@ -91,17 +91,17 @@ Camera Tip (Shutter) ─── Collector (pin 5) ┐
 Camera Sleeve (GND) ──── Emitter   (pin 4) ┘
 ```
 
-When GPIO 27 is driven **HIGH**, the shutter is released.
+When GPIO 26 is driven **HIGH**, the shutter is released.
 
 > **Ground note:** The ESP32 GND and the camera's Sleeve (GND) are **not** connected together. The optocoupler provides full galvanic isolation. The camera circuit is self-contained on the output/transistor side.
 
 ### 5.4 Focus Pushbutton
 
-Connect one terminal of the Focus pushbutton to **GPIO 4**, the other to **GND**. The firmware enables the internal pull-up (`INPUT_PULLUP`). A button press reads as LOW.
+Connect one terminal of the Focus pushbutton to **GPIO 18**, the other to **GND**. The firmware enables the internal pull-up (`INPUT_PULLUP`). A button press reads as LOW.
 
 ### 5.5 Shutter Release Pushbutton
 
-Connect one terminal of the Shutter Release pushbutton to **GPIO 15**, the other to **GND**. The firmware enables the internal pull-up (`INPUT_PULLUP`). A button press reads as LOW.
+Connect one terminal of the Shutter Release pushbutton to **GPIO 19**, the other to **GND**. The firmware enables the internal pull-up (`INPUT_PULLUP`). A button press reads as LOW.
 
 ---
 
@@ -111,21 +111,21 @@ Connect one terminal of the Shutter Release pushbutton to **GPIO 15**, the other
 
 The controller has two independent momentary pushbuttons — **Focus** and **Shutter Release** — that directly control the corresponding optocoupler channels. The user controls timing by how long each button is physically held.
 
-#### 6.1.1 Focus Button (GPIO 4)
+#### 6.1.1 Focus Button (GPIO 18)
 
 | Condition | Action |
 |-----------|--------|
-| Focus button pressed and held | Assert Focus (GPIO 26 HIGH) — camera initiates autofocus |
-| Focus button released | De-assert Focus (GPIO 26 LOW) |
+| Focus button pressed and held | Assert Focus (GPIO 25 HIGH) — camera initiates autofocus |
+| Focus button released | De-assert Focus (GPIO 25 LOW) |
 
 The Focus line remains active for exactly as long as the user holds the button.
 
-#### 6.1.2 Shutter Release Button (GPIO 15)
+#### 6.1.2 Shutter Release Button (GPIO 19)
 
 | Condition | Action |
 |-----------|--------|
-| Shutter Release button pressed and held | Assert Shutter (GPIO 27 HIGH) — camera releases shutter |
-| Shutter Release button released | De-assert Shutter (GPIO 27 LOW) |
+| Shutter Release button pressed and held | Assert Shutter (GPIO 26 HIGH) — camera releases shutter |
+| Shutter Release button released | De-assert Shutter (GPIO 26 LOW) |
 
 The Shutter line remains active for exactly as long as the user holds the button.
 
@@ -148,7 +148,7 @@ Both buttons shall be software-debounced with a minimum period of **50 ms** to p
 
 ### 6.4 Idle State
 
-In the idle state both GPIO 26 and GPIO 27 shall be **LOW** (optocouplers off, camera undisturbed).
+In the idle state both GPIO 25 and GPIO 26 shall be **LOW** (optocouplers off, camera undisturbed).
 
 ### 6.5 Serial Debug Output
 
@@ -183,10 +183,10 @@ loop()
 ```
 ESP32-WROOM-32
 ┌──────────────────────────┐
-│  GPIO 26 ──[220Ω]── 4N36 #1 (Focus)   → Camera Ring
-│  GPIO 27 ──[220Ω]── 4N36 #2 (Shutter) → Camera Tip
-│  GPIO  4 ── Focus pushbutton ── GND
-│  GPIO 15 ── Shutter Release pushbutton ── GND
+│  GPIO 25 ──[220Ω]── 4N36 #1 (Focus)   → Camera Ring
+│  GPIO 26 ──[220Ω]── 4N36 #2 (Shutter) → Camera Tip
+│  GPIO 18 ── Focus pushbutton ── GND
+│  GPIO 19 ── Shutter Release pushbutton ── GND
 │  GND     ── Optocoupler cathodes, Button GND
 │  3.3V    ── (unused)
 └──────────────────────────┘
