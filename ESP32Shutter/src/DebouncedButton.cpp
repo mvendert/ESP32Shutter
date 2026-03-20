@@ -7,10 +7,10 @@ DebouncedButton::DebouncedButton(uint8_t pin, uint32_t debounceMs)
       stableState_(false),
       lastChangeTimeMs_(0) {}
 
-void DebouncedButton::begin() { pinMode(pin_, INPUT_PULLUP); }
+void DebouncedButton::begin() { pinMode(pin_, INPUT); }
 
 bool DebouncedButton::isHeld() {
-  const bool rawPressed = (digitalRead(pin_) == LOW);
+  const bool rawPressed = (digitalRead(pin_) == HIGH);
 
   if (rawPressed != lastRawState_) {
     lastRawState_ = rawPressed;

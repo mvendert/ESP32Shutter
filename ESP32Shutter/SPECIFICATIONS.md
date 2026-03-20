@@ -205,3 +205,30 @@ Camera 2.5 mm TRS plug
 3. **Display/feedback:** Is any visual feedback (LED, OLED display) required beyond Serial debug output?
 4. **Power supply:** Will the ESP32 be powered via USB or a dedicated battery pack?
 5. ~~**Focus-only mode:** Should the Focus channel be triggerable independently (without shutter release)?~~ **Resolved** — Focus and Shutter are now independent buttons.
+
+## Additional Information
+Canon’s published still-photo burst limits for the EOS R6 are:
+
+1. About 12 fps with the mechanical shutter
+2. About 20 fps with the electronic shutter
+
+That translates to:
+
+1. 12 fps -> about 83 ms between frames
+2. 20 fps -> about 50 ms between frames
+
+What that means for your ESP32 shutter trigger:
+
+If the camera is in a continuous drive mode, the best spec-based approach is to hold the shutter contact closed and let the camera free-run.
+A faster optocoupler or faster GPIO toggling will not make the R6 shoot faster than its own rated burst speed.
+Canon does not appear to publish a minimum E3 remote-contact pulse width or a maximum remote pulse repetition rate, so there is no Canon spec saying "X ms pulse guarantees one shot."
+Practical conclusion:
+
+For repeated shots using the E3 remote input, design around 12 Hz max mechanical or 20 Hz max electronic.
+If you want one pulse per frame, do not schedule rising edges faster than 83 ms apart for mechanical or 50 ms apart for electronic.
+If you want the highest reliable burst rate, use continuous drive mode and keep the shutter optocoupler on for the duration of the burst.
+About the optocoupler itself:
+
+A 4N36-class phototransistor optocoupler is electrically fast enough for 12 to 20 fps by a wide margin.
+Your spec already assumes only about 0.5 mA sink current on the camera side, so the device is not current-limited for this job.
+If you really meant 4N46 instead of 4N36, I would verify that exact part’s datasheet before finalizing hardware, but the camera is still the dominant limit here.
