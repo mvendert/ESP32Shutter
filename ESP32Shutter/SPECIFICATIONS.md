@@ -242,13 +242,12 @@ Camera 2.5 mm TRS plug
 
 ---
 
-## 9. Open Questions / Clarifications Needed
+## 9. Future Additions
 
-1. **Intervalometer mode:** Should the device support automatic repeated shooting at fixed intervals? If yes, what range (seconds/minutes)?
-2. **Bulb mode:** Is long-exposure / bulb mode (hold shutter open for a programmable duration) required?
-3. **Display/feedback:** Is any visual feedback (LED, OLED display) required beyond Serial debug output?
-4. **Power supply:** Will the ESP32 be powered via USB or a dedicated battery pack?
-5. ~~**Focus-only mode:** Should the Focus channel be triggerable independently (without shutter release)?~~ **Resolved** — Focus and Shutter are now independent buttons.
+1. **Light Sensor Trigger:** A laser and lasersensor will be added. When the laserbeam is broken a shutter release will be triggered
+2. **delay mode:** When the shutter release is trigged via the above laser, a variable amount of time should be delayed before the shutter is released. This shutter delay time should be settable via a variable 10K resistor.
+3. **Display/feedback:** An indicator of the delay time should be added via some form of 4x8 segment display.
+4. **Power supply:** Ultimately this whole contraption should be powered by a battery to be added to the esp32 and thus a battery loading circuut should be added also.
 
 ## Additional Information
 Canon’s published still-photo burst limits for the EOS R6 are:
