@@ -8,7 +8,8 @@
 namespace {
 DebouncedButton focusButton(Config::FOCUS_BUTTON_PIN, Config::BUTTON_DEBOUNCE_MS);
 DebouncedButton shutterButton(Config::SHUTTER_BUTTON_PIN, Config::BUTTON_DEBOUNCE_MS);
-OptocouplerShutterController shutterController(Config::FOCUS_PIN, Config::SHUTTER_PIN);
+OptocouplerShutterController shutterController(Config::FOCUS_PIN, Config::SHUTTER_PIN,
+                                                Config::FOCUS_LED_PIN, Config::SHUTTER_LED_PIN);
 ShutterApp app(focusButton, shutterButton, shutterController,
                Config::TELEMETRY_INTERVAL_MS);
 }  // namespace

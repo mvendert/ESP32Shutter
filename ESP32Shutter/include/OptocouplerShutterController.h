@@ -6,7 +6,8 @@
 
 class OptocouplerShutterController : public IShutterController {
  public:
-  OptocouplerShutterController(uint8_t focusPin, uint8_t shutterPin);
+  OptocouplerShutterController(uint8_t focusPin, uint8_t shutterPin,
+                               uint8_t focusLedPin, uint8_t shutterLedPin);
 
   void begin() override;
   void setFocus(bool active) override;
@@ -15,6 +16,8 @@ class OptocouplerShutterController : public IShutterController {
  private:
   uint8_t focusPin_;
   uint8_t shutterPin_;
+  uint8_t focusLedPin_;
+  uint8_t shutterLedPin_;
   bool focusActive_;
   bool shutterActive_;
 };

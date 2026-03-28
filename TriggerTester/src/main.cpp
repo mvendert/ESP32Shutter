@@ -6,6 +6,9 @@ const int pinShutter = 26;
 const int pinButFocus = 18;
 const int pinButRelease = 19;
 
+const int pinLedFocus = 16;
+const int pinLedRelease = 15;
+
 Drukknop butFocus(pinButFocus, INPUT);
 Drukknop butRelease(pinButRelease, INPUT);
 
@@ -19,8 +22,12 @@ void setup() {
   Serial.println("Camera Remote Control");
   pinMode(pinFocus, OUTPUT);
   pinMode(pinShutter, OUTPUT);
+  pinMode(pinLedFocus, OUTPUT);
+  pinMode(pinLedRelease, OUTPUT);
   digitalWrite(pinFocus, LOW);
   digitalWrite(pinShutter, LOW);  
+  digitalWrite(pinLedFocus, LOW);
+  digitalWrite(pinLedRelease, LOW);
   isFocus = isRelease = false;
   butFocus.leesKnop();
   butRelease.leesKnop();
@@ -38,6 +45,8 @@ void loop() {
   if (butRelease.toestandIs(Drukknop::DrukknopToestand::Indrukken)) {
     digitalWrite(pinFocus, HIGH);
     digitalWrite(pinShutter, HIGH);
+    digitalWrite(pinLedFocus, HIGH);
+    digitalWrite(pinLedRelease, HIGH);
     startReleaseMillis = currentMillis;
     startFocusMillis = currentMillis;
     isFocus = true;
@@ -47,6 +56,7 @@ void loop() {
   if (!isRelease) {
     if (butFocus.toestandIs(Drukknop::DrukknopToestand::Indrukken)) {
       digitalWrite(pinFocus, HIGH);
+      digitalWrite(pinLedFocus, HIGH);
       startFocusMillis = currentMillis;
       isFocus = true;
     }
@@ -68,9 +78,11 @@ void loop() {
   }
   if (!isRelease) {
     digitalWrite(pinShutter, LOW);
+    digitalWrite(pinLedRelease, LOW);
   }
   if (!isFocus) {
     digitalWrite(pinFocus, LOW);
+    digitalWrite(pinLedFocus, LOW);
   }
 
   /*

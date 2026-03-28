@@ -32,7 +32,8 @@ The Canon EOS R6 exposes a **2.5 mm stereo (TRS) "Remote" jack** — Canon's pro
 |-----------|----------|-------|
 | ESP32-WROOM-32 DevKit | 1 | 3.3 V GPIO logic |
 | 4N36 optocoupler | 2 | One for Focus, one for Shutter |
-| 220 Ω resistor | 2 | Input-side current limiting (see §5) |
+| 220 Ω resistor | 4 | 2× optocoupler input-side current limiting (see §5.1), 2× LED current limiting (see §5.6) |
+| LED (standard, e.g. 3 mm) | 2 | 1× Focus status, 1× Shutter status |
 | 2.5 mm TRS plug / cable | 1 | Wired to camera remote jack |
 | Momentary pushbutton | 2 | One for Focus, one for Shutter Release |
 | Assorted resistors | — | Pull-downs / pull-ups as needed |
@@ -48,6 +49,8 @@ The Canon EOS R6 exposes a **2.5 mm stereo (TRS) "Remote" jack** — Canon's pro
 |------|-----------|----------|
 | **GPIO 25** | Digital Output | Focus control — drives 4N36 #1 LED anode (via 220 Ω) |
 | **GPIO 26** | Digital Output | Shutter control — drives 4N36 #2 LED anode (via 220 Ω) |
+| **GPIO 15** | Digital Output | Focus status LED — indicates Focus line is active |
+| **GPIO 16** | Digital Output | Shutter status LED — indicates Shutter line is active |
 | **GPIO 18** | Digital Input (INPUT_PULLUP) | Focus pushbutton (active LOW) |
 | **GPIO 19** | Digital Input (INPUT_PULLUP) | Shutter Release pushbutton (active LOW) |
 
@@ -94,6 +97,30 @@ Camera Sleeve (GND) ──── Emitter   (pin 4) ┘
 When GPIO 26 is driven **HIGH**, the shutter is released.
 
 > **Ground note:** The ESP32 GND and the camera's Sleeve (GND) are **not** connected together. The optocoupler provides full galvanic isolation. The camera circuit is self-contained on the output/transistor side.
+
+### 5.6 Status LEDs
+
+Two LEDs provide visual feedback showing when the Focus and Shutter lines are active.
+
+#### 5.6.1 Focus Status LED (GPIO 15)
+
+```
+ESP32 GPIO 15 ──► Anode  ┐
+                   LED    │
+                  Cathode ┘──[220 Ω]── GND
+```
+
+When GPIO 15 is driven **HIGH**, the Focus status LED lights up, indicating the Focus optocoupler is active (autofocus engaged).
+
+#### 5.6.2 Shutter Status LED (GPIO 16)
+
+```
+ESP32 GPIO 16 ──► Anode  ┐
+                   LED    │
+                  Cathode ┘──[220 Ω]── GND
+```
+
+When GPIO 16 is driven **HIGH**, the Shutter status LED lights up, indicating the Shutter optocoupler is active (shutter released).
 
 ### 5.4 Focus Pushbutton
 
@@ -142,13 +169,26 @@ The two buttons operate **independently and simultaneously**. The typical shooti
 
 > **Note:** If the Shutter Release button is pressed **without** the Focus button, only the shutter fires (no autofocus). This is useful when the camera is set to manual focus or when focus has already been acquired.
 
-### 6.2 Button Debouncing
+### 6.2 Status LED Indication
+
+The Focus and Shutter status LEDs shall mirror the state of their respective optocoupler output pins:
+
+| Condition | Focus LED (GPIO 15) | Shutter LED (GPIO 16) |
+|-----------|---------------------|------------------------|
+| Focus active (GPIO 25 HIGH) | ON | — |
+| Focus inactive (GPIO 25 LOW) | OFF | — |
+| Shutter active (GPIO 26 HIGH) | — | ON |
+| Shutter inactive (GPIO 26 LOW) | — | OFF |
+
+The LEDs are driven in the same `update()` cycle as the optocoupler outputs, ensuring they always reflect the current state with no perceptible delay.
+
+### 6.3 Button Debouncing
 
 Both buttons shall be software-debounced with a minimum period of **50 ms** to prevent false triggers from contact bounce.
 
 ### 6.4 Idle State
 
-In the idle state both GPIO 25 and GPIO 26 shall be **LOW** (optocouplers off, camera undisturbed).
+In the idle state GPIO 25, GPIO 26, GPIO 15, and GPIO 16 shall all be **LOW** (optocouplers off, LEDs off, camera undisturbed).
 
 ### 6.5 Serial Debug Output
 
@@ -163,16 +203,18 @@ setup()
   ├─ Serial.begin(115200)
   ├─ pinMode(FOCUS_PIN,          OUTPUT)     → LOW
   ├─ pinMode(SHUTTER_PIN,       OUTPUT)     → LOW
+  ├─ pinMode(FOCUS_LED_PIN,     OUTPUT)     → LOW
+  ├─ pinMode(SHUTTER_LED_PIN,   OUTPUT)     → LOW
   ├─ pinMode(FOCUS_BUTTON_PIN,  INPUT_PULLUP)
   └─ pinMode(SHUTTER_BUTTON_PIN, INPUT_PULLUP)
 
 loop()
   ├─ read Focus button (debounced)
-  │   ├─ held  → digitalWrite(FOCUS_PIN,   HIGH)
-  │   └─ released → digitalWrite(FOCUS_PIN, LOW)
+  │   ├─ held  → digitalWrite(FOCUS_PIN,   HIGH), digitalWrite(FOCUS_LED_PIN,   HIGH)
+  │   └─ released → digitalWrite(FOCUS_PIN, LOW),  digitalWrite(FOCUS_LED_PIN,   LOW)
   ├─ read Shutter Release button (debounced)
-  │   ├─ held  → digitalWrite(SHUTTER_PIN,   HIGH)
-  │   └─ released → digitalWrite(SHUTTER_PIN, LOW)
+  │   ├─ held  → digitalWrite(SHUTTER_PIN,   HIGH), digitalWrite(SHUTTER_LED_PIN,   HIGH)
+  │   └─ released → digitalWrite(SHUTTER_PIN, LOW),  digitalWrite(SHUTTER_LED_PIN,   LOW)
   └─ serial debug output (periodic)
 ```
 
@@ -185,9 +227,11 @@ ESP32-WROOM-32
 ┌──────────────────────────┐
 │  GPIO 25 ──[220Ω]── 4N36 #1 (Focus)   → Camera Ring
 │  GPIO 26 ──[220Ω]── 4N36 #2 (Shutter) → Camera Tip
+│  GPIO 15 ──► Focus LED    ──[220Ω]── GND
+│  GPIO 16 ──► Shutter LED  ──[220Ω]── GND
 │  GPIO 18 ── Focus pushbutton ── GND
 │  GPIO 19 ── Shutter Release pushbutton ── GND
-│  GND     ── Optocoupler cathodes, Button GND
+│  GND     ── Optocoupler cathodes, Button GND, LED resistors
 │  3.3V    ── (unused)
 └──────────────────────────┘
 Camera 2.5 mm TRS plug
