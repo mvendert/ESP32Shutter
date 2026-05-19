@@ -9,6 +9,10 @@
 		},
 		{
 			"path": "Documentation"
+		},
+		{
+			"name": "blinker",
+			"path": "C:/Users/marc/Documents/PlatformIO/Projects/blinker"
 		}
 	],
 	"settings": {}

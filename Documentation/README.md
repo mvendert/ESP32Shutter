@@ -62,7 +62,8 @@ The source tree is split into a few small units:
 - `include/DebouncedButton.h` and `src/DebouncedButton.cpp`: GPIO-backed button input with software debounce.
 - `include/OptocouplerShutterController.h` and `src/OptocouplerShutterController.cpp`: GPIO-backed focus/shutter output driver plus LED mirroring.
 - `include/ShutterApp.h` and `src/ShutterApp.cpp`: top-level application coordinator.
-- `include/Ky008Laser.h` and `src/Ky008Laser.cpp`: laser emitter/sensor helper classes prepared for future trigger modes.
+- `include/Ky008LaserEmitter.h` and `src/Ky008LaserEmitter.cpp`: laser emitter helper class prepared for future trigger modes.
+- `include/Ky008LaserSensor.h` and `src/Ky008LaserSensor.cpp`: laser sensor helper class prepared for future trigger modes.
 - `src/main.cpp`: object composition root and Arduino entry points.
 
 This is effectively a manual dependency-injection layout. `main.cpp` constructs concrete instances and hands them to `ShutterApp` through interface references.
@@ -301,6 +302,11 @@ An experienced Arduino developer will notice a few likely next steps immediately
 3. Decide whether future laser triggering should appear as another `ITriggerInput` (cleanest) or whether the app needs an explicit state machine for delayed capture logic.
 4. Add timing-based shutter pulse generation if the optical trigger should fire a controlled pulse rather than track a held state.
 5. Consider a small hardware abstraction test harness so application behavior can be verified without hardware — the existing interfaces already make this straightforward.
+
+##Links
+https://www.waveshare.com/wiki/Laser_Sensor
+https://www.youtube.com/watch?v=nkIkBK2J19g
+receiver- RJT474
 
 ## Summary
 
