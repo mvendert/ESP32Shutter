@@ -307,6 +307,34 @@ An experienced Arduino developer will notice a few likely next steps immediately
 https://www.waveshare.com/wiki/Laser_Sensor
 https://www.youtube.com/watch?v=nkIkBK2J19g
 receiver- RJT474
+https://www.youtube.com/watch?v=uuRNfvj5Sz8
+
+The right way:
+To get full brightness safely, power the laser module using the 5V (VIN or 5V) pin on your ESP32 board, and use a simple NPN transistor (like a 2N2222) as a switch to control it via a 3.3V GPIO pin
+
+Wiring Setup:
+1.Transistor Base: Connect to an ESP32 GPIO pin (e.g., GPIO 23) through a 1kΩ resistor.
+2.Transistor Collector: Connect to the Ground (-) pin of the KY-008 module.
+3.Transistor Emitter: Connect to the GND pin of the ESP32.
+4.KY-008 S (Signal) Pin: Connect to the 5V / VIN pin of the ESP32 (which outputs 5V when plugged into USB).
+5.KY-008 Center Pin: Leave disconnected.
+
+If you do not have a transistor, you can use a logic-level shifter to cleanly convert the 3.3V ESP32 signal up to 5V to drive the laser module.
+
+
+Transistor Switching Method (Recommended)This method acts like an electronic switch. The ESP32's 3.3V pin safely handles a tiny signal current to turn on the transistor, which then securely handles the 5V power loop for the laser module.        +5V (VIN / 5V) --------------------------> [ S ] 
+                                                                [   ]  KY-008 Laser
+                                                                [ - ]
+                                                                  |
+                                                                  |
+                                                             [Collector]
+                                                                  |
+  ESP32 GPIO (e.g., 23) --[ 1kΩ Resistor ]---- [Base]     2N2222 NPN Transistor
+                                                     |
+                                                 [Emitter]
+                                                     |
+        GND -----------------------------------------+----------------> [GND]
+Note on Bipolar Transistors (like 2N2222): Looking at the flat side of the transistor with the pins pointing down, the pinout from left to right is Emitter (1), Base (2), Collector (3).
 
 ## Summary
 

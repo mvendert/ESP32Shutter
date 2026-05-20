@@ -23,14 +23,15 @@ int Ky008LaserSensor::readRaw() const
 {
   int value = digitalRead(pin_);
 
-  /*
-  static int prevmillis = 0;
-  if (millis() - prevmillis > 500)
-  {
-    Serial.print("Raw sensor value: ");
-    Serial.println(value);
-    prevmillis = millis();
-  }
-  */   
+  
+  //static int prevmillis = 0;
+  //if (millis() - prevmillis > 500)
+  //{
+  //  Serial.print("Raw sensor value: ");
+  //  Serial.println(value);
+  //  prevmillis = millis();
+  //}
+
+     
   return value;
 }

@@ -13,7 +13,7 @@ OptocouplerShutterController shutterController(Config::FOCUS_PIN, Config::SHUTTE
                                                 Config::FOCUS_LED_PIN, Config::SHUTTER_LED_PIN);
 ShutterApp app(focusButton, shutterButton, shutterController,
                Config::TELEMETRY_INTERVAL_MS);
-Ky008LaserSensor LaserSensor(34);
+Ky008LaserSensor LaserSensor(34, INPUT, LOW);
 }  // namespace
 
 static bool prevStateBeam = false;
