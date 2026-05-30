@@ -1,6 +1,6 @@
 # ESP32Shutter — Code Overview
 
-> **Scope of this document.** This README describes the **current state of the firmware** in [ESP32Shutter/](../ESP32Shutter/). For the intended hardware design, wiring diagrams, and electrical requirements, see [SPECIFICATIONS.md](../ESP32Shutter/SPECIFICATIONS.md). Where the two disagree, the spec is the target and this document records the implementation as it stands.
+> **Scope of this document.** This README describes an older snapshot of the firmware in [ESP32Shutter/](../ESP32Shutter/). The combined current hardware specification and firmware design now live in [shutter.md](../ESP32Shutter/shutter.md).
 >
 > A companion firmware project, [TriggerTester/](../TriggerTester/), is a small standalone sketch used to validate pushbutton wiring independently of the main controller.
 
@@ -297,7 +297,7 @@ The code is still intentionally simple, and that simplicity is a strength here. 
 
 An experienced Arduino developer will notice a few likely next steps immediately:
 
-1. **Bug / spec mismatch:** align the button implementation with the documented hardware by switching to `INPUT_PULLUP` and active-low handling — the spec ([SPECIFICATIONS.md §5.4–5.5](../ESP32Shutter/SPECIFICATIONS.md)) wires the buttons to GND and expects a press to read LOW.
+1. **Button wiring / firmware polarity:** align the physical button wiring with the current firmware or update `DebouncedButton`; see [shutter.md](../ESP32Shutter/shutter.md) for the current source-backed behavior.
 2. Remove or actually use `lastFocusHeld_` and `lastShutterHeld_` to keep `ShutterApp` tight.
 3. Decide whether future laser triggering should appear as another `ITriggerInput` (cleanest) or whether the app needs an explicit state machine for delayed capture logic.
 4. Add timing-based shutter pulse generation if the optical trigger should fire a controlled pulse rather than track a held state.
