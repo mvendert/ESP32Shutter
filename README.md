@@ -3,6 +3,7 @@
 **Target camera:** Canon EOS R6  
 **Target MCU board:** ESP32-WROOM-32 DevKit  
 **Firmware project:** `ESP32Shutter`  
+**License:** GPL-3.0  
 **Last updated:** 2026-05-30
 
 This document is the combined hardware specification and firmware design note for
@@ -416,9 +417,9 @@ hardware or adapter classes.
 ```cpp
 class ITriggerInput {
  public:
-  virtual ~ITriggerInput() = default;
-  virtual void begin() = 0;
-  virtual bool isHeld() = 0;
+   virtual ~ITriggerInput() = default;
+   virtual void begin() = 0;
+   virtual bool isHeld() = 0;
 };
 ```
 
@@ -431,9 +432,9 @@ The focus button uses this interface directly because focus is level-based.
 ```cpp
 class IShutterTrigger {
  public:
-  virtual ~IShutterTrigger() = default;
-  virtual void begin() = 0;
-  virtual bool consumeFireRequest() = 0;
+   virtual ~IShutterTrigger() = default;
+   virtual void begin() = 0;
+   virtual bool consumeFireRequest() = 0;
 };
 ```
 
@@ -447,10 +448,10 @@ advances the implementation's internal state.
 ```cpp
 class IShutterController {
  public:
-  virtual ~IShutterController() = default;
-  virtual void begin() = 0;
-  virtual void setFocus(bool active) = 0;
-  virtual void setShutter(bool active) = 0;
+   virtual ~IShutterController() = default;
+   virtual void begin() = 0;
+   virtual void setFocus(bool active) = 0;
+   virtual void setShutter(bool active) = 0;
 };
 ```
 
