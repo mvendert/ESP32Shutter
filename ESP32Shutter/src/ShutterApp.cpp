@@ -5,25 +5,27 @@ ShutterApp::ShutterApp(ITriggerInput& focusButton,
                        size_t shutterTriggerCount,
                        IShutterController& shutterController,
                        uint32_t telemetryIntervalMs,
-                       uint32_t shutterPulseMs,
-                       uint32_t minIntervalMs)
+                       uint32_t shutterPulseMs)
     : focusButton_(focusButton),
       shutterTriggers_(shutterTriggers),
       shutterTriggerCount_(shutterTriggerCount),
       shutterController_(shutterController),
       telemetryIntervalMs_(telemetryIntervalMs),
       shutterPulseMs_(shutterPulseMs),
-      minIntervalMs_(minIntervalMs),
+      triggerStates_(),
       lastTelemetryTimeMs_(0),
-      lastFireTimeMs_(0),
       pulseStartTimeMs_(0),
-      hasFiredOnce_(false),
-      shutterActive_(false),
-      lastFocusHeld_(false) {}
+      shutterActive_(false) {}
 
 void ShutterApp::begin() {
   focusButton_.begin();
-  for (size_t i = 0; i < shutterTriggerCount_; ++i) {
+
+  if (shutterTriggerCount_ > MAX_SHUTTER_TRIGGERS) {
+    Serial.print("Too many shutter triggers configured; using first ");
+    Serial.println(MAX_SHUTTER_TRIGGERS);
+  }
+
+  for (size_t i = 0; i < activeTriggerCount(); ++i) {
     if (shutterTriggers_[i] != nullptr) {
       shutterTriggers_[i]->begin();
     }
@@ -32,12 +34,9 @@ void ShutterApp::begin() {
   Serial.println("Shutter app ready");
 }
 
-void ShutterApp::setMinimumIntervalMs(uint32_t intervalMs) {
-  minIntervalMs_ = intervalMs;
-}
-
-void ShutterApp::setMinimumIntervalSeconds(uint32_t seconds) {
-  minIntervalMs_ = seconds * 1000UL;
+size_t ShutterApp::activeTriggerCount() const {
+  return shutterTriggerCount_ < MAX_SHUTTER_TRIGGERS ? shutterTriggerCount_
+                                                     : MAX_SHUTTER_TRIGGERS;
 }
 
 void ShutterApp::update() {
@@ -49,28 +48,37 @@ void ShutterApp::update() {
 
   // --- Shutter triggers: poll every source so internal edge state advances,
   // even if we won't act on the request because of cooldown/active pulse.
-  bool fireRequested = false;
-  for (size_t i = 0; i < shutterTriggerCount_; ++i) {
-    if (shutterTriggers_[i] == nullptr) continue;
-    if (shutterTriggers_[i]->consumeFireRequest()) {
-      fireRequested = true;
+  bool fireAccepted = false;
+  uint32_t acceptedCooldownMs = 0;
+  for (size_t i = 0; i < activeTriggerCount(); ++i) {
+    IShutterTrigger* trigger = shutterTriggers_[i];
+    if (trigger == nullptr) continue;
+    if (!trigger->consumeFireRequest()) continue;
+
+    TriggerState& triggerState = triggerStates_[i];
+    const uint32_t triggerCooldownMs = trigger->minimumIntervalMs();
+    const bool cooldownElapsed =
+        !triggerState.hasFiredOnce ||
+        (now - triggerState.lastFireTimeMs) >= triggerCooldownMs;
+
+    if (!fireAccepted && !shutterActive_ && cooldownElapsed) {
+      shutterActive_ = true;
+      pulseStartTimeMs_ = now;
+      triggerState.lastFireTimeMs = now;
+      triggerState.hasFiredOnce = true;
+      acceptedCooldownMs = triggerCooldownMs;
+      shutterController_.setShutter(true);
+      Serial.print("Shutter: FIRE, trigger_cooldown_ms=");
+      Serial.println(acceptedCooldownMs);
+      fireAccepted = true;
     }
   }
 
-  const bool cooldownElapsed =
-      !hasFiredOnce_ || (now - lastFireTimeMs_) >= minIntervalMs_;
-
-  if (fireRequested && !shutterActive_ && cooldownElapsed) {
-    shutterActive_ = true;
-    pulseStartTimeMs_ = now;
-    lastFireTimeMs_ = now;
-    hasFiredOnce_ = true;
-    shutterController_.setShutter(true);
-    Serial.println("Shutter: FIRE");
-  } else if (shutterActive_ && (now - pulseStartTimeMs_) >= shutterPulseMs_) {
+  if (!fireAccepted && shutterActive_ &&
+      (now - pulseStartTimeMs_) >= shutterPulseMs_) {
     shutterActive_ = false;
     shutterController_.setShutter(false);
-  } else if (!shutterActive_) {
+  } else if (!fireAccepted && !shutterActive_) {
     // Keep the controller line low between pulses.
     shutterController_.setShutter(false);
   }
@@ -82,9 +90,7 @@ void ShutterApp::update() {
     Serial.print(focusHeld ? "ON" : "OFF");
     Serial.print(", shutter=");
     Serial.print(shutterActive_ ? "ON" : "OFF");
-    Serial.print(", cooldown_ms=");
-    Serial.println(minIntervalMs_);
+    Serial.print(", triggers=");
+    Serial.println(activeTriggerCount());
   }
-
-  lastFocusHeld_ = focusHeld;
 }

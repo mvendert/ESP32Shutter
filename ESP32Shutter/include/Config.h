@@ -23,7 +23,7 @@ constexpr uint32_t TELEMETRY_INTERVAL_MS = 500;
 // Duration of a single shutter pulse driven by the controller.
 constexpr uint32_t SHUTTER_PULSE_MS = 200;
 
-// Minimum time, in seconds, between two successive shutter firings regardless
-// of which trigger requested them.
-constexpr uint32_t SHUTTER_MIN_INTERVAL_S = 2;
+// Minimum time between accepted shutter firings from each trigger source.
+constexpr uint32_t BUTTON_SHUTTER_MIN_INTERVAL_MS = 300;
+constexpr uint32_t LASER_SHUTTER_MIN_INTERVAL_MS = 2000;
 }  // namespace Config

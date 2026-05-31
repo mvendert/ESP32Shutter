@@ -17,8 +17,10 @@ Ky008LaserSensor laserSensor(Config::LASER_SENSOR_PIN, INPUT,
                              Config::LASER_SENSOR_DETECTED_STATE);
 
 // Shutter trigger sources
-ButtonShutterTrigger buttonTrigger(shutterButton);
-LaserBreakShutterTrigger laserTrigger(laserSensor);
+ButtonShutterTrigger buttonTrigger(shutterButton,
+                                   Config::BUTTON_SHUTTER_MIN_INTERVAL_MS);
+LaserBreakShutterTrigger laserTrigger(laserSensor,
+                                      Config::LASER_SHUTTER_MIN_INTERVAL_MS);
 
 IShutterTrigger* shutterTriggers[] = {&buttonTrigger, &laserTrigger};
 constexpr size_t SHUTTER_TRIGGER_COUNT =
@@ -31,8 +33,7 @@ OptocouplerShutterController shutterController(Config::FOCUS_PIN, Config::SHUTTE
 // Application coordinator
 ShutterApp app(focusButton, shutterTriggers, SHUTTER_TRIGGER_COUNT,
                shutterController, Config::TELEMETRY_INTERVAL_MS,
-               Config::SHUTTER_PULSE_MS,
-               Config::SHUTTER_MIN_INTERVAL_S * 1000UL);
+               Config::SHUTTER_PULSE_MS);
 }  // namespace
 
 void setup() {

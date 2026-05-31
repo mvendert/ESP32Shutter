@@ -1,7 +1,11 @@
 #include "LaserBreakShutterTrigger.h"
 
-LaserBreakShutterTrigger::LaserBreakShutterTrigger(Ky008LaserSensor& sensor)
-    : sensor_(sensor), armed_(false), lastDetected_(false) {}
+LaserBreakShutterTrigger::LaserBreakShutterTrigger(Ky008LaserSensor& sensor,
+                                                   uint32_t minimumIntervalMs)
+    : sensor_(sensor),
+      minimumIntervalMs_(minimumIntervalMs),
+      armed_(false),
+      lastDetected_(false) {}
 
 void LaserBreakShutterTrigger::begin() {
   // The sensor itself is initialized by its owner. We only arm the trigger
@@ -28,4 +32,8 @@ bool LaserBreakShutterTrigger::consumeFireRequest() {
 
   lastDetected_ = detected;
   return fire;
+}
+
+uint32_t LaserBreakShutterTrigger::minimumIntervalMs() const {
+  return minimumIntervalMs_;
 }

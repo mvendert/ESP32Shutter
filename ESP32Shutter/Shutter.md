@@ -31,8 +31,8 @@ The current firmware supports these user inputs and trigger sources:
 - a KY-008 laser receiver that requests one shutter pulse when the beam is broken.
 
 Focus remains level-based. Shutter firing is event-based: each accepted fire
-request creates a fixed-width output pulse, and a shared cooldown prevents two
-accepted shutter firings from occurring too close together.
+request creates a fixed-width output pulse. Each shutter trigger owns its own
+cooldown, so different release types can use different repeat timing.
 
 ---
 
@@ -91,7 +91,8 @@ optocouplers keep the ESP32 circuit and camera circuit galvanically isolated.
 | `BUTTON_DEBOUNCE_MS` | 50 ms | N/A | Button debounce interval |
 | `TELEMETRY_INTERVAL_MS` | 500 ms | N/A | Periodic serial status interval |
 | `SHUTTER_PULSE_MS` | 200 ms | N/A | Width of one shutter output pulse |
-| `SHUTTER_MIN_INTERVAL_S` | 2 s | N/A | Minimum interval between accepted firings |
+| `BUTTON_SHUTTER_MIN_INTERVAL_MS` | 300 ms | N/A | Minimum interval between accepted shutter-button firings |
+| `LASER_SHUTTER_MIN_INTERVAL_MS` | 2000 ms | N/A | Minimum interval between accepted laser-break firings |
 
 GPIO 34 is input-only on the ESP32, which is appropriate for the laser receiver.
 The current receiver configuration reports `LOW` while the beam is present and
@@ -264,7 +265,7 @@ The shutter button is event-based in the current firmware.
 |-----------|--------|
 | Shutter button changes from released to held | Request one shutter pulse |
 | Shutter button remains held | No additional requests |
-| Shutter button is released and pressed again | Request another pulse, subject to cooldown |
+| Shutter button is released and pressed again | Request another pulse, subject to the shutter-button cooldown |
 
 This differs from a purely mechanical RS-60E3 remote, where holding the shutter
 switch would hold the shutter contact closed. The current firmware uses pulse
@@ -382,7 +383,7 @@ Current object graph:
 - `LaserBreakShutterTrigger laserTrigger` adapts beam breaks into fire events.
 - `IShutterTrigger* shutterTriggers[]` contains both shutter sources.
 - `OptocouplerShutterController shutterController` drives focus, shutter, and LEDs.
-- `ShutterApp app` coordinates focus level control, shutter pulses, cooldown, and telemetry.
+- `ShutterApp app` coordinates focus level control, shutter pulses, per-trigger cooldowns, and telemetry.
 
 Arduino entry points:
 
@@ -434,11 +435,13 @@ class IShutterTrigger {
   virtual ~IShutterTrigger() = default;
   virtual void begin() = 0;
   virtual bool consumeFireRequest() = 0;
+    virtual uint32_t minimumIntervalMs() const = 0;
 };
 ```
 
 `consumeFireRequest()` returns `true` once for a logical event and then clears or
-advances the implementation's internal state.
+advances the implementation's internal state. `minimumIntervalMs()` returns the
+cooldown that applies only to accepted fire requests from that trigger.
 
 ### 11.3 Output Controller: `IShutterController`
 
@@ -467,40 +470,39 @@ The current concrete implementation is `OptocouplerShutterController`.
 | Active condition | Button held | Released to held transition | Detected to broken transition |
 | Output behavior | Output follows button | Starts fixed pulse | Starts fixed pulse |
 | Repeat behavior | Continuous while held | One fire per press | One fire per beam break, then re-arm on beam restore |
-| Cooldown applies | No | Yes | Yes |
+| Cooldown applies | No | 300 ms between accepted button firings | 2000 ms between accepted laser firings |
 
 ---
 
 ## 13. Shutter Pulse And Cooldown
 
-`ShutterApp` owns all shutter timing policy.
+`ShutterApp` owns shutter pulse timing and cooldown enforcement. Each shutter
+trigger owns its own cooldown duration.
 
 On every `update()` call it polls every registered `IShutterTrigger`, even during
-cooldown. Polling all sources every loop is deliberate: it lets each adapter keep
-its internal edge or arming state current even when the app discards a request.
+another trigger's cooldown. Polling all sources every loop is deliberate: it lets
+each adapter keep its internal edge or arming state current even when the app
+discards a request.
 
 The app starts a shutter pulse only when all of these are true:
 
-- at least one trigger returned `true`;
+- a trigger returned `true`;
 - no shutter pulse is currently active;
-- the minimum interval since the previous accepted firing has elapsed.
+- that trigger's minimum interval since its previous accepted firing has elapsed.
 
 When a pulse starts:
 
 1. `shutterActive_` becomes `true`.
-2. `pulseStartTimeMs_` and `lastFireTimeMs_` are set to `millis()`.
+2. `pulseStartTimeMs_` and that trigger's `lastFireTimeMs` are set to `millis()`.
 3. `shutterController_.setShutter(true)` asserts the optocoupler and LED.
-4. `Serial.println("Shutter: FIRE")` is emitted.
+4. A `Shutter: FIRE` serial message is emitted with the trigger cooldown value.
 
 When `SHUTTER_PULSE_MS` has elapsed, the app calls
 `shutterController_.setShutter(false)` and the output returns low.
 
-The cooldown can be changed at runtime with:
-
-```cpp
-app.setMinimumIntervalMs(intervalMs);
-app.setMinimumIntervalSeconds(seconds);
-```
+Cooldowns are independent per shutter trigger. A laser fire starts only the laser
+trigger's cooldown; the shutter button can still fire after its own 300 ms
+cooldown has elapsed.
 
 ---
 
@@ -526,9 +528,9 @@ sequenceDiagram
     App->>Laser: consumeFireRequest()
     Laser-->>App: fire or no fire
 
-    alt fire requested and cooldown elapsed and no pulse active
+    alt trigger fire requested and its cooldown elapsed and no pulse active
         App->>Ctrl: setShutter(true)
-        Note over App: start pulse and record last fire time
+        Note over App: start pulse and record that trigger's last fire time
     else active pulse elapsed
         App->>Ctrl: setShutter(false)
     else idle between pulses
@@ -541,8 +543,8 @@ Key invariants:
 - focus and shutter are independent;
 - only one shutter pulse can be active at a time;
 - each accepted shutter request produces a pulse instead of a held output;
-- the cooldown is shared by the button trigger and the laser trigger;
-- laser state is consumed continuously so beam restore/break transitions do not get stuck behind the cooldown.
+- each shutter trigger has its own cooldown state;
+- laser state is consumed continuously so beam restore/break transitions do not get stuck behind another trigger's cooldown.
 
 ---
 
@@ -560,6 +562,7 @@ classDiagram
         <<interface>>
         +begin()
         +consumeFireRequest() bool
+        +minimumIntervalMs() uint32_t
     }
 
     class IShutterController {
@@ -591,17 +594,21 @@ classDiagram
 
     class ButtonShutterTrigger {
         -ITriggerInput& input_
+        -uint32_t minimumIntervalMs_
         -bool lastHeld_
         +begin()
         +consumeFireRequest() bool
+        +minimumIntervalMs() uint32_t
     }
 
     class LaserBreakShutterTrigger {
         -Ky008LaserSensor& sensor_
+        -uint32_t minimumIntervalMs_
         -bool armed_
         -bool lastDetected_
         +begin()
         +consumeFireRequest() bool
+        +minimumIntervalMs() uint32_t
     }
 
     class OptocouplerShutterController {
@@ -615,12 +622,10 @@ classDiagram
         -IShutterTrigger* const* shutterTriggers_
         -IShutterController& shutterController_
         -uint32_t shutterPulseMs_
-        -uint32_t minIntervalMs_
+        -TriggerState triggerStates_[]
         -bool shutterActive_
         +begin()
         +update()
-        +setMinimumIntervalMs(uint32_t)
-        +setMinimumIntervalSeconds(uint32_t)
     }
 
     ITriggerInput <|.. DebouncedButton
@@ -696,13 +701,13 @@ Output types:
 - app initialization: `Shutter app ready`;
 - focus transitions: `Focus asserted (HIGH)` or `Focus released (LOW)`;
 - shutter transitions: `Shutter asserted (HIGH)` or `Shutter released (LOW)`;
-- accepted fire events: `Shutter: FIRE`;
+- accepted fire events: `Shutter: FIRE, trigger_cooldown_ms=<value>`;
 - periodic telemetry every 500 ms by default.
 
 Telemetry format:
 
 ```text
-focus=ON, shutter=OFF, cooldown_ms=2000
+focus=ON, shutter=OFF, triggers=2
 ```
 
 ---
@@ -720,9 +725,9 @@ Examples:
 - analog threshold trigger;
 - delayed laser trigger after a potentiometer-selected wait time.
 
-Keep source-specific edge detection, arming, or threshold logic inside the trigger
-adapter. Keep shared shutter timing policy in `ShutterApp` so every source uses the
-same pulse and cooldown rules.
+Keep source-specific edge detection, arming, threshold logic, and cooldown values
+inside the trigger adapter. Keep shared pulse timing in `ShutterApp` so every
+source uses the same physical shutter pulse behavior.
 
 Future hardware or firmware additions:
 
@@ -751,12 +756,6 @@ items remain worth tracking:
    `laserSensor` before `app.begin()`, while `app.begin()` initializes focus and
    triggers. This works, but ownership would be clearer if each adapter initialized
    its dependency or if `main.cpp` initialized all hardware explicitly.
-4. **Cooldown unit API**: `Config` stores `SHUTTER_MIN_INTERVAL_S`, while
-   `ShutterApp` stores milliseconds. This is handled correctly at construction, but
-   future UI code should be explicit about units.
-5. **`lastFocusHeld_` is currently unused for behavior**: it is stored at the end of
-   `update()` but does not affect decisions. It can be removed unless upcoming edge
-   logic needs it.
 
 ---
 
@@ -769,7 +768,7 @@ small event-driven firmware architecture:
 - the shutter button produces one fire request per press;
 - the laser sensor produces one fire request per beam break;
 - every accepted request creates a fixed-width shutter pulse;
-- a shared cooldown applies across all shutter sources;
+- each shutter trigger applies its own cooldown between accepted requests;
 - LEDs mirror the actual focus and shutter outputs;
 - the camera-side circuit remains isolated from ESP32 ground through the 4N36
   optocouplers.

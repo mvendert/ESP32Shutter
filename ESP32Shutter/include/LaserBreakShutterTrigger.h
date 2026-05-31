@@ -1,5 +1,7 @@
 #pragma once
 
+#include <Arduino.h>
+
 #include "IShutterTrigger.h"
 #include "Ky008LaserSensor.h"
 
@@ -9,13 +11,15 @@
 // the beam remains broken.
 class LaserBreakShutterTrigger : public IShutterTrigger {
  public:
-  explicit LaserBreakShutterTrigger(Ky008LaserSensor& sensor);
+  LaserBreakShutterTrigger(Ky008LaserSensor& sensor, uint32_t minimumIntervalMs);
 
   void begin() override;
   bool consumeFireRequest() override;
+  uint32_t minimumIntervalMs() const override;
 
  private:
   Ky008LaserSensor& sensor_;
+  uint32_t minimumIntervalMs_;
   bool armed_;
   bool lastDetected_;
 };

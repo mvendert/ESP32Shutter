@@ -1,7 +1,8 @@
 #include "ButtonShutterTrigger.h"
 
-ButtonShutterTrigger::ButtonShutterTrigger(ITriggerInput& input)
-    : input_(input), lastHeld_(false) {}
+ButtonShutterTrigger::ButtonShutterTrigger(ITriggerInput& input,
+                       uint32_t minimumIntervalMs)
+  : input_(input), minimumIntervalMs_(minimumIntervalMs), lastHeld_(false) {}
 
 void ButtonShutterTrigger::begin() {
   // The underlying ITriggerInput is initialized by its owner; we only need to
@@ -15,4 +16,8 @@ bool ButtonShutterTrigger::consumeFireRequest() {
   const bool risingEdge = held && !lastHeld_;
   lastHeld_ = held;
   return risingEdge;
+}
+
+uint32_t ButtonShutterTrigger::minimumIntervalMs() const {
+  return minimumIntervalMs_;
 }

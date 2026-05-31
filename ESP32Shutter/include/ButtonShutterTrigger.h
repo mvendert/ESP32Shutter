@@ -1,5 +1,7 @@
 #pragma once
 
+#include <Arduino.h>
+
 #include "IShutterTrigger.h"
 #include "ITriggerInput.h"
 
@@ -8,12 +10,14 @@
 // rising edge of the underlying input.
 class ButtonShutterTrigger : public IShutterTrigger {
  public:
-  explicit ButtonShutterTrigger(ITriggerInput& input);
+  ButtonShutterTrigger(ITriggerInput& input, uint32_t minimumIntervalMs);
 
   void begin() override;
   bool consumeFireRequest() override;
+  uint32_t minimumIntervalMs() const override;
 
  private:
   ITriggerInput& input_;
+  uint32_t minimumIntervalMs_;
   bool lastHeld_;
 };
